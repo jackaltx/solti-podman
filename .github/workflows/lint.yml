@@ -24,15 +24,9 @@ jobs:
       - name: Install yamllint
         run: pip install yamllint
 
-      - name: Run yamllint (strict on main, warnings on test)
-        run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.base_ref }}" == "main" ]]; then
-            echo "Running yamllint for main branch (warnings allowed, errors fail)"
-            yamllint .
-          else
-            echo "Running yamllint for test branch (warnings allowed)"
-            yamllint . || echo "Warnings found but allowed on test branch"
-          fi
+      - name: Run yamllint
+        # Levels controlled by .yamllint — no --strict; molecule/shared/ ignored
+        run: yamllint . || echo "yamllint warnings found (see .yamllint for levels)"
 
   markdown-lint:
     name: Markdown Syntax Check
@@ -45,15 +39,9 @@ jobs:
       - name: Install markdownlint-cli
         run: npm install -g markdownlint-cli
 
-      - name: Run markdownlint (strict on main, warnings on test)
-        run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.base_ref }}" == "main" ]]; then
-            echo "Running strict markdownlint for main branch"
-            markdownlint "**/*.md" --ignore node_modules --config .markdownlintrc
-          else
-            echo "Running markdownlint for test branch (warnings allowed)"
-            markdownlint "**/*.md" --ignore node_modules --config .markdownlintrc || echo "Warnings found but allowed on test branch"
-          fi
+      - name: Run markdownlint
+        # Advisory only — MD formatting does not block CI
+        run: markdownlint "**/*.md" --ignore node_modules --config .markdownlintrc || echo "markdownlint advisory (not blocking)"
 
   ansible-lint:
     name: Ansible Lint

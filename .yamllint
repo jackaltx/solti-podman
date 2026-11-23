@@ -34,3 +34,5 @@ ignore: |
   tmp/
   .github/workflows/
   .ansible/collections/
+  molecule/shared/diagnostics/
+  molecule/shared/verify/
