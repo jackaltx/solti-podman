@@ -26,6 +26,7 @@ jobs:
           echo "Log size: $(wc -c < failure-logs.txt) bytes"
 
       - name: Analyze with Claude
+        if: ${{ github.event.workflow_run.event != 'pull_request' || github.event.workflow_run.head_repository.full_name == github.repository }}
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
