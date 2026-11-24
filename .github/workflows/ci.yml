@@ -27,6 +27,12 @@ jobs:
           pip install ansible-lint ansible-core yamllint
           npm install -g markdownlint-cli
 
+      - name: "[TEST] Deliberate failure to test analyze-failure.yml — REVERT THIS"
+        run: |
+          echo "Simulating a CI failure to test Claude analysis workflow"
+          echo "This step will be removed immediately after the test"
+          exit 1
+
       - name: Run yamllint
         run: |
           # Levels controlled by .yamllint config — no --strict override
