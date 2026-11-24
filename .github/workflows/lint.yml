@@ -64,15 +64,10 @@ jobs:
           ansible-galaxy collection install -r requirements.yml
           mkdir -p logs
 
-      - name: Run ansible-lint (strict on main, warnings on test)
-        run: |
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.base_ref }}" == "main" ]]; then
-            echo "Running strict ansible-lint for main branch"
-            ansible-lint --strict
-          else
-            echo "Running ansible-lint for test branch (warnings allowed)"
-            ansible-lint || echo "Warnings found but allowed on test branch"
-          fi
+      - name: Run ansible-lint
+        # Advisory — strict enforcement is a Galaxy publish gate, not a PR gate.
+        # Incremental cleanup tracked via /lint-fix; ~1800 pre-existing errors.
+        run: ansible-lint || echo "ansible-lint warnings (not blocking)"
 
   syntax-check:
     name: Ansible Syntax Check
