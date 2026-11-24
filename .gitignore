@@ -36,8 +36,11 @@ Thumbs.db
 *.crt
 !roles/*/files/*.crt
 
-# Site-specific inventory overrides (use all.yml.example as template)
+# Private inventory — nested private git repo (*-inventory on Gitea + GitHub)
+# inventory/hosts/group_vars/all.yml holds private site config
+# inventory/group_vars/*_svc.yml are public testing defaults (tracked in collection)
 inventory/group_vars/all.yml
+inventory/hosts/
 
 # Backup files
 *.bak
@@ -48,10 +51,6 @@ inventory/group_vars/all.yml
 .env
 .envrc
 local_*
-
-# private inventory
-inventory/group_vars/*.local.yml
-inventory/hosts/
 
 # Python virtual environments
 solti-venv/
