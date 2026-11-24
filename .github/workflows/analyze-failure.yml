@@ -106,12 +106,10 @@ jobs:
               )
               print(f"Posted to PR #{pr_number}")
           else:
-
-          # Fall back to commit comment
-          subprocess.run(
-              ["gh", "api", f"/repos/{repo}/commits/{sha}/comments",
-               "-f", f"body={body}"],
-              check=True
-          )
-          print(f"Posted to commit {sha[:8]}")
+              subprocess.run(
+                  ["gh", "api", f"/repos/{repo}/commits/{sha}/comments",
+                   "-f", f"body={body}"],
+                  check=True
+              )
+              print(f"Posted to commit {sha[:8]}")
           PYEOF
