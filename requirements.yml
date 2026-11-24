@@ -7,3 +7,6 @@ collections:
   - name: containers.podman
     version: ">=1.0.0"
   - name: jackaltx.solti_matrix_mgr
+    source: https://github.com/jackaltx/solti-matrix-mgr.git
+    type: git
+    version: main
