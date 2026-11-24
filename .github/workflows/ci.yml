@@ -27,6 +27,11 @@ jobs:
           pip install ansible-lint ansible-core yamllint
           npm install -g markdownlint-cli
 
+      - name: "[TEST] Deliberate failure — REVERT THIS"
+        run: |
+          echo "Testing analyze-failure.yml Claude integration"
+          exit 1
+
       - name: Run yamllint
         run: |
           # Levels controlled by .yamllint config — no --strict override
