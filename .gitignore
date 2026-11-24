@@ -40,7 +40,7 @@ Thumbs.db
 # inventory/hosts/group_vars/all.yml holds private site config
 # inventory/group_vars/*_svc.yml are public testing defaults (tracked in collection)
 inventory/group_vars/all.yml
-inventory/hosts/
+inventory/hosts
 
 # Backup files
 *.bak
