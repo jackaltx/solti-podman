@@ -59,6 +59,11 @@ jobs:
       - name: Install ansible-lint
         run: pip install ansible-lint ansible-core yamllint
 
+      - name: Install Ansible collections
+        run: |
+          ansible-galaxy collection install -r requirements.yml
+          mkdir -p logs
+
       - name: Run ansible-lint (strict on main, warnings on test)
         run: |
           if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.base_ref }}" == "main" ]]; then
