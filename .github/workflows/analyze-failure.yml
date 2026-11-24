@@ -1,0 +1,106 @@
+---
+name: Analyze CI Failure
+
+on:
+  workflow_run:
+    workflows: ["CI", "Lint and Syntax Check"]
+    types: [completed]
+
+jobs:
+  analyze:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: write
+
+    steps:
+      - name: Fetch failure logs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run view ${{ github.event.workflow_run.id }} \
+            --repo ${{ github.repository }} \
+            --log-failed 2>&1 | head -c 8000 > failure-logs.txt
+          echo "Log size: $(wc -c < failure-logs.txt) bytes"
+          cat failure-logs.txt
+
+      - name: Analyze with Claude
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          python3 << 'PYEOF'
+          import json, os, sys, urllib.request, urllib.error
+
+          logs = open("failure-logs.txt").read().strip()
+          if not logs:
+              print("No failure logs found")
+              open("analysis.txt", "w").write("No failure log output captured.")
+              sys.exit(0)
+
+          payload = {
+              "model": "claude-haiku-4-5-20251001",
+              "max_tokens": 400,
+              "messages": [{
+                  "role": "user",
+                  "content": (
+                      "These are CI failure logs from an Ansible collection. "
+                      "Identify the root cause in 2-3 sentences and suggest a specific fix. "
+                      "Be concise — this will be posted as a GitHub comment.\n\n"
+                      f"```\n{logs}\n```"
+                  )
+              }]
+          }
+
+          req = urllib.request.Request(
+              "https://api.anthropic.com/v1/messages",
+              data=json.dumps(payload).encode(),
+              headers={
+                  "x-api-key": os.environ["ANTHROPIC_API_KEY"],
+                  "anthropic-version": "2023-06-01",
+                  "content-type": "application/json",
+              }
+          )
+
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  result = json.load(resp)
+              analysis = result["content"][0]["text"]
+          except urllib.error.HTTPError as e:
+              analysis = f"Claude API error {e.code}: {e.read().decode()}"
+
+          open("analysis.txt", "w").write(analysis)
+          print(analysis)
+          PYEOF
+
+      - name: Post analysis comment
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ANALYSIS=$(cat analysis.txt)
+          WORKFLOW_NAME="${{ github.event.workflow_run.name }}"
+          WORKFLOW_URL="${{ github.event.workflow_run.html_url }}"
+          RUN_ID="${{ github.event.workflow_run.id }}"
+          SHA="${{ github.event.workflow_run.head_sha }}"
+
+          BODY="**CI Analysis** — \`${WORKFLOW_NAME}\` failed
+
+          ${ANALYSIS}
+
+          [View workflow run](${WORKFLOW_URL})"
+
+          # Try to find associated PR first
+          PR_NUMBER=$(gh api \
+            /repos/${{ github.repository }}/actions/runs/${RUN_ID}/pull_requests \
+            --jq '.[0].number' 2>/dev/null || echo "")
+
+          if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
+            echo "Posting to PR #${PR_NUMBER}"
+            gh pr comment "$PR_NUMBER" --repo ${{ github.repository }} --body "$BODY"
+          else
+            echo "No PR found, posting to commit ${SHA}"
+            gh api \
+              /repos/${{ github.repository }}/commits/${SHA}/comments \
+              -f body="$BODY"
+          fi
