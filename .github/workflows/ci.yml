@@ -27,6 +27,9 @@ jobs:
           pip install ansible-lint ansible-core yamllint
           npm install -g markdownlint-cli
 
+      - name: Install Ansible collections
+        run: ansible-galaxy collection install -r requirements.yml
+
       - name: Run yamllint
         run: |
           # Levels controlled by .yamllint config — no --strict override
