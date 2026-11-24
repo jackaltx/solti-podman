@@ -11,7 +11,7 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       actions: read
       pull-requests: write
 
@@ -24,7 +24,6 @@ jobs:
             --repo ${{ github.repository }} \
             --log-failed 2>&1 | head -c 8000 > failure-logs.txt
           echo "Log size: $(wc -c < failure-logs.txt) bytes"
-          cat failure-logs.txt
 
       - name: Analyze with Claude
         env:
@@ -35,7 +34,6 @@ jobs:
 
           logs = open("failure-logs.txt").read().strip()
           if not logs:
-              print("No failure logs found")
               open("analysis.txt", "w").write("No failure log output captured.")
               sys.exit(0)
 
@@ -77,30 +75,51 @@ jobs:
       - name: Post analysis comment
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+          WORKFLOW_URL: ${{ github.event.workflow_run.html_url }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          REPO: ${{ github.repository }}
         run: |
-          ANALYSIS=$(cat analysis.txt)
-          WORKFLOW_NAME="${{ github.event.workflow_run.name }}"
-          WORKFLOW_URL="${{ github.event.workflow_run.html_url }}"
-          RUN_ID="${{ github.event.workflow_run.id }}"
-          SHA="${{ github.event.workflow_run.head_sha }}"
+          python3 << 'PYEOF'
+          import json, os, subprocess, sys
 
-          BODY="**CI Analysis** — \`${WORKFLOW_NAME}\` failed
+          analysis = open("analysis.txt").read().strip()
+          workflow_name = os.environ["WORKFLOW_NAME"]
+          workflow_url = os.environ["WORKFLOW_URL"]
+          run_id = os.environ["RUN_ID"]
+          sha = os.environ["SHA"]
+          repo = os.environ["REPO"]
 
-          ${ANALYSIS}
+          body = (
+              f"**CI Analysis** — `{workflow_name}` failed\n\n"
+              f"{analysis}\n\n"
+              f"[View workflow run]({workflow_url})"
+          )
 
-          [View workflow run](${WORKFLOW_URL})"
+          # Try PR first
+          try:
+              result = subprocess.run(
+                  ["gh", "api", f"/repos/{repo}/actions/runs/{run_id}/pull_requests"],
+                  capture_output=True, text=True, check=True
+              )
+              prs = json.loads(result.stdout)
+              if prs and isinstance(prs, list) and prs[0].get("number"):
+                  pr_number = prs[0]["number"]
+                  subprocess.run(
+                      ["gh", "pr", "comment", str(pr_number), "--repo", repo, "--body", body],
+                      check=True
+                  )
+                  print(f"Posted to PR #{pr_number}")
+                  sys.exit(0)
+          except Exception as e:
+              print(f"PR lookup failed ({e}), falling back to commit comment")
 
-          # Try to find associated PR first
-          PR_NUMBER=$(gh api \
-            /repos/${{ github.repository }}/actions/runs/${RUN_ID}/pull_requests \
-            --jq '.[0].number' 2>/dev/null || echo "")
-
-          if [ -n "$PR_NUMBER" ] && [ "$PR_NUMBER" != "null" ]; then
-            echo "Posting to PR #${PR_NUMBER}"
-            gh pr comment "$PR_NUMBER" --repo ${{ github.repository }} --body "$BODY"
-          else
-            echo "No PR found, posting to commit ${SHA}"
-            gh api \
-              /repos/${{ github.repository }}/commits/${SHA}/comments \
-              -f body="$BODY"
-          fi
+          # Fall back to commit comment
+          subprocess.run(
+              ["gh", "api", f"/repos/{repo}/commits/{sha}/comments",
+               "-f", f"body={body}"],
+              check=True
+          )
+          print(f"Posted to commit {sha[:8]}")
+          PYEOF
