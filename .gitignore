@@ -58,3 +58,6 @@ venv/
 .venv/
 env/
 ENV/
+
+# Developer architecture notes — stay local, not shipped
+CLAUDE.md
